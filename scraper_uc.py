@@ -33,6 +33,10 @@ def scrape_http_fallback(url):
     except Exception as e:
         return {"error": f"Fallback HTTP fetch failed: {str(e)}"}
 
+    lowered = html.lower()
+    if "access denied" in lowered or "blocked" in lowered and "coupang" in lowered:
+        return {"error": "Access Denied (blocked by Coupang)"}
+
     title = ""
     image = ""
     price = 0
@@ -49,6 +53,9 @@ def scrape_http_fallback(url):
         if m:
             title = re.sub(r"\s+", " ", m.group(1)).strip()
             title = re.sub(r"\s*[|\-–]\s*쿠팡.*$", "", title).strip()
+
+    if title.strip().lower() == "access denied":
+        return {"error": "Access Denied (blocked by Coupang)"}
 
     m = re.search(
         r'<meta\s+(?:property="og:image"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:image")',

@@ -118,6 +118,9 @@ def scrape(req: ScrapeRequest, x_internal_token: str | None = Header(default=Non
     title = payload.get("title") if isinstance(payload.get("title"), str) else ""
     image = payload.get("image") if isinstance(payload.get("image"), str) else ""
 
+    if title.strip().lower() == "access denied":
+        raise HTTPException(status_code=422, detail="Access Denied (blocked by Coupang)")
+
     raw_price = payload.get("price")
     if isinstance(raw_price, (int, float)):
         price = int(raw_price)
@@ -126,6 +129,9 @@ def scrape(req: ScrapeRequest, x_internal_token: str | None = Header(default=Non
         price = int(nums) if nums else 0
     else:
         price = 0
+
+    if price <= 0:
+        raise HTTPException(status_code=422, detail="Failed to extract valid price")
 
     return {
         "title": title,
