@@ -5,6 +5,8 @@ import sys
 import json
 import re
 import time
+import os
+from pathlib import Path
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -18,12 +20,32 @@ def scrape(url):
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--window-size=1920,1080")
+
+    # Render/server 환경에서는 headless 실행이 필요합니다.
+    if os.getenv("SCRAPER_HEADLESS", "1") == "1":
+        options.add_argument("--headless=new")
+
+    chrome_bin = os.getenv("CHROME_BIN") or os.getenv("CHROME_BINARY")
+    if not chrome_bin:
+        candidates = [
+            "/usr/bin/google-chrome",
+            "/usr/bin/chromium",
+            "/usr/bin/chromium-browser",
+            "/opt/google/chrome/chrome",
+        ]
+        for candidate in candidates:
+            if Path(candidate).exists():
+                chrome_bin = candidate
+                break
+
+    if chrome_bin:
+        options.binary_location = chrome_bin
     
     # We use visible (headless=False) mode to bypass anti-bot
     # Window move off-screen to minimize disruption
     
     try:
-        driver = uc.Chrome(options=options)
+        driver = uc.Chrome(options=options, use_subprocess=False)
     except Exception as e:
         return {"error": f"Chrome launch failed: {str(e)}"}
     
