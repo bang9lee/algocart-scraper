@@ -7,6 +7,7 @@ import re
 import time
 import os
 from pathlib import Path
+import requests
 import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -14,6 +15,82 @@ from selenium.webdriver.support import expected_conditions as EC
 
 # Configure stdout for utf-8
 sys.stdout.reconfigure(encoding='utf-8')
+
+
+def scrape_http_fallback(url):
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=20, allow_redirects=True)
+        html = resp.text or ""
+    except Exception as e:
+        return {"error": f"Fallback HTTP fetch failed: {str(e)}"}
+
+    title = ""
+    image = ""
+    price = 0
+
+    m = re.search(
+        r'<meta\s+(?:property="og:title"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:title")',
+        html,
+        re.I,
+    )
+    if m:
+        title = (m.group(1) or m.group(2) or "").strip()
+    if not title:
+        m = re.search(r"<title>(.*?)</title>", html, re.I | re.S)
+        if m:
+            title = re.sub(r"\s+", " ", m.group(1)).strip()
+            title = re.sub(r"\s*[|\-–]\s*쿠팡.*$", "", title).strip()
+
+    m = re.search(
+        r'<meta\s+(?:property="og:image"\s+content="([^"]+)"|content="([^"]+)"\s+property="og:image")',
+        html,
+        re.I,
+    )
+    if m:
+        image = (m.group(1) or m.group(2) or "").strip()
+        if image.startswith("//"):
+            image = "https:" + image
+
+    patterns = [
+        r'"salePrice"\s*:\s*(\d+)',
+        r'"discountedPrice"\s*:\s*(\d+)',
+        r'"currentPrice"\s*:\s*(\d+)',
+        r'"price"\s*:\s*(\d+)',
+        r'<meta\s+(?:property="product:price:amount"\s+content="([^"]+)"|content="([^"]+)"\s+property="product:price:amount")',
+    ]
+
+    for pat in patterns:
+        mm = re.search(pat, html, re.I)
+        if not mm:
+            continue
+        raw = (mm.group(1) or (mm.group(2) if mm.lastindex and mm.lastindex >= 2 else "") or "").strip()
+        nums = re.sub(r"[^\d]", "", raw)
+        if nums:
+            price = int(nums)
+            if price > 0:
+                break
+
+    if not price:
+        candidates = re.findall(r'(\d{1,3}(?:,\d{3})*)\s*원', html)
+        vals = []
+        for c in candidates:
+            v = int(c.replace(",", ""))
+            if v > 100:
+                vals.append(v)
+        if vals:
+            reasonable = [v for v in vals if v > 2000]
+            price = min(reasonable) if reasonable else max(vals)
+
+    return {"title": title, "price": price, "image": image}
 
 def scrape(url):
     options = uc.ChromeOptions()
@@ -57,7 +134,10 @@ def scrape(url):
     try:
         driver = uc.Chrome(**chrome_kwargs)
     except Exception as e:
-        return {"error": f"Chrome launch failed: {str(e)}"}
+        fallback = scrape_http_fallback(url)
+        if not fallback.get("error"):
+            return fallback
+        return {"error": f"Chrome launch failed: {str(e)}; {fallback.get('error', '')}"}
     
     try:
         driver.set_window_position(-10000, 0)
