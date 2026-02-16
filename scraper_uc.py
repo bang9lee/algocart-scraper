@@ -44,8 +44,16 @@ def scrape(url):
     # We use visible (headless=False) mode to bypass anti-bot
     # Window move off-screen to minimize disruption
     
+    chrome_kwargs = {
+        "options": options,
+        "use_subprocess": False,
+        # Some uc versions default this to False (bool), which triggers
+        # "Binary Location Must be a String" in Selenium. Pass None/string explicitly.
+        "browser_executable_path": chrome_bin if chrome_bin else None,
+    }
+
     try:
-        driver = uc.Chrome(options=options, use_subprocess=False)
+        driver = uc.Chrome(**chrome_kwargs)
     except Exception as e:
         return {"error": f"Chrome launch failed: {str(e)}"}
     

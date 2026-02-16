@@ -27,11 +27,12 @@ Optional security header:
 4. Start Command: `uvicorn server:app --host 0.0.0.0 --port $PORT`
 5. Add env var `SCRAPER_SERVICE_TOKEN`.
 6. Add env var `SCRAPER_HEADLESS=1`.
-7. Add env var `CHROME_BIN=/usr/bin/chromium` (if using native runtime).
-8. In Render Build Command, install Chromium if needed:
+7. Optional: set `CHROME_BIN` only if your runtime already has Chromium.
+
+Use Render native Python build command:
 
 ```bash
-apt-get update && apt-get install -y chromium chromium-driver && pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ## Vercel App Integration
