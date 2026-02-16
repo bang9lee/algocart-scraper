@@ -47,10 +47,12 @@ def scrape(url):
     chrome_kwargs = {
         "options": options,
         "use_subprocess": False,
-        # Some uc versions default this to False (bool), which triggers
-        # "Binary Location Must be a String" in Selenium. Pass None/string explicitly.
-        "browser_executable_path": chrome_bin if chrome_bin else None,
     }
+    # In some uc + selenium combos, None/False can trigger
+    # "Binary Location Must be a String".
+    # Only pass this field when we have an actual string path.
+    if chrome_bin:
+        chrome_kwargs["browser_executable_path"] = chrome_bin
 
     try:
         driver = uc.Chrome(**chrome_kwargs)
